@@ -125,26 +125,60 @@ sudo systemctl status cloudflared --no-pager
 
 ## 3. 部署 MCP
 
-克隆仓库：
+`git clone` 只会把项目文件下载到 VPS，出于安全原因不会自动执行任何安装脚本。首次部署时，需要由人类在 SSH 终端中依次运行下面三条命令：
 
 ```bash
 git clone https://github.com/gobly2333/kelivo-remote-ssh-mcp.git
 cd kelivo-remote-ssh-mcp
-```
-
-运行安装器：
-
-```bash
 sudo bash scripts/install.sh
 ```
 
-安装器会询问：
+如果仓库此前已经克隆完成，只需进入目录并运行安装器：
 
-- MCP 公网域名，例如 `mcp.example.com`。
-- SSH Host；MCP 与目标 VPS 是同一台机器时保持 `127.0.0.1`。
-- SSH 端口和用户名。
-- 使用密码还是私钥认证。
-- 是否配置危险命令黑名单。
+```bash
+cd kelivo-remote-ssh-mcp
+sudo bash scripts/install.sh
+```
+
+直接以 `root` 登录 VPS 时，可以省略 `sudo`：
+
+```bash
+cd kelivo-remote-ssh-mcp
+bash scripts/install.sh
+```
+
+安装器启动后会依次询问以下内容。方括号中的值是默认值，想使用默认值时直接按回车：
+
+1. `Public MCP domain`：填写前面在 Cloudflare 创建的完整主机名，例如 `mcp.example.com`。不要填写 `https://`，也不要添加 `/sse`。
+2. `SSH host [127.0.0.1]`：如果 MCP 与要操作的 SSH 服务位于同一台 VPS，直接回车。
+3. `SSH port [22]`：SSH 没有修改过端口时直接回车。
+4. `SSH username [root]`：使用 root 登录时直接回车；否则填写实际 SSH 用户名。
+5. `Authentication`：输入 `1` 使用密码，输入 `2` 使用私钥；直接回车默认选择密码。
+6. `SSH password` 或 `Absolute private key path`：输入对应凭据。输入密码时终端不会显示字符，这是正常现象，输完按回车即可。
+7. `Local MCP port [3000]`：Cloudflare Service URL 使用 `http://localhost:3000` 时直接回车。
+
+例如，同一台 VPS、root 用户、22 端口、密码认证的填写方式是：
+
+```text
+Public MCP domain (example: mcp.example.com): mcp.example.com
+SSH host [127.0.0.1]:              # 直接回车
+SSH port [22]:                     # 直接回车
+SSH username [root]:               # 直接回车
+Authentication:
+  1) Password
+  2) Private key
+Choose [1]:                         # 直接回车
+SSH password:                       # 输入密码，屏幕不会显示
+Local MCP port [3000]:              # 直接回车
+```
+
+安装器随后会自动：
+
+- 生成随机的 MCP 路径。
+- 把 SSH 和运行配置保存到仅 root 可读的配置文件。
+- 使用 PM2 启动 `supergateway` 和 SSH MCP Server。
+- 保存 PM2 进程列表。
+- 检查 `http://127.0.0.1:3000/healthz` 是否正常。
 
 密码输入不会回显。配置保存到：
 
@@ -157,11 +191,24 @@ sudo bash scripts/install.sh
 
 完成后安装器会显示一条带随机路径的 Kelivo SSE URL，例如：
 
-```text
-https://mcp.example.com/4df2.../sse
+```console
+MCP is healthy.
+Kelivo transport: SSE
+Kelivo URL: https://mcp.example.com/4df2.../sse
+```
+
+复制 `Kelivo URL:` 后面的**完整地址**。不要只填写域名，也不要自行把它改成固定的 `/sse`。
+
+如果没有看到 `MCP is healthy.`，安装器会给出日志检查命令。也可以手动运行：
+
+```bash
+pm2 logs kelivo-remote-ssh-mcp --lines 100 --nostream
+curl http://127.0.0.1:3000/healthz
 ```
 
 随机路径只能降低被扫描发现的概率，**不等于身份认证**。真正公开使用时请阅读 [SECURITY.md](SECURITY.md)。
+
+重新运行安装器会替换现有 PM2 进程并生成新的随机路径，因此 Kelivo 中原来的 SSE 地址也需要更新。
 
 ## 4. Kelivo 配置
 
