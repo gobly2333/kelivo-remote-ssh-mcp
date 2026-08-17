@@ -41,7 +41,64 @@ ssh-mcp-server
 
 不需要把域名的 A 记录指向 VPS，也不需要开放公网 `3000` 端口。
 
-## 1. 创建 Cloudflare Tunnel
+## 首次部署时，人类和模型分别能做什么
+
+如果你目前只有 Kelivo 里的普通 LLM，没有 Codex、Claude Code 或其他已经连接 VPS 的 Agent，**首次部署必须由人类通过 SSH 手动完成**。
+
+在 MCP 连接成功之前，模型只能根据你粘贴回来的终端输出提供下一条命令，不能直接操作 VPS。你需要亲自完成：
+
+- 使用 Termius、系统终端等 SSH 客户端登录 VPS。
+- 在 Cloudflare 网页创建 Tunnel，并把页面生成的 connector 安装命令粘贴到 VPS。
+- 在 VPS 中安装基础环境、克隆本仓库并运行安装器。
+- 把安装器输出的 SSE 地址填入 Kelivo，并将 MCP 分配给助手。
+
+完成这些步骤以后，只要所用模型 API 支持 Tool Calls，它就能通过 Kelivo 调用 `execute-command`、`upload`、`download` 和 `list-servers`，不要求模型本身是 Codex。
+
+## 1. 登录 VPS 并安装基础环境
+
+下面的命令需要由人类在 VPS 的 SSH 终端中执行。Ubuntu 用户使用具有 `sudo` 权限的账号；直接以 `root` 登录时可以省略 `sudo`。
+
+先更新软件索引并安装基础工具：
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl git openssl
+```
+
+检查 Node.js 版本：
+
+```bash
+node -v
+```
+
+如果提示找不到命令，或者主版本低于 20，可使用 NodeSource 为 Ubuntu/Debian 安装系统级 Node.js 22：
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+sudo -E bash /tmp/nodesource_setup.sh
+sudo apt install -y nodejs
+```
+
+安装 PM2：
+
+```bash
+sudo npm install -g pm2@latest
+```
+
+逐项验证环境：
+
+```bash
+git --version
+node -v
+npm -v
+pm2 -v
+curl --version | head -n 1
+openssl version
+```
+
+其中 Node.js 必须为 `v20` 或更高版本。安装器会在 PM2 缺失时尝试自动安装 PM2，但不会替你安装 Node.js、npm、Git、curl 或 openssl，因此建议先完成本节。
+
+## 2. 创建 Cloudflare Tunnel
 
 1. 打开 Cloudflare 主控制台的 **Networking → Tunnels**。
 2. 选择 **Create a tunnel**，填写名称并创建。
@@ -57,26 +114,16 @@ Service URL: http://localhost:3000
 
 保存后 Cloudflare 会为这个 hostname 创建对应的 Tunnel DNS 路由。
 
-## 2. 安装环境
+页面会根据当前 Tunnel 生成带有专属 Token 的 `cloudflared` 安装命令，优先使用页面显示的命令，不要把 Token 写进公开教程、截图或 Git 仓库。
 
-检查现有版本：
+安装 connector 后可在 VPS 检查：
 
 ```bash
-node -v
-npm -v
-pm2 -v
 cloudflared --version
+sudo systemctl status cloudflared --no-pager
 ```
 
-如果 Node.js 或 PM2 尚未安装，请先安装 Node.js 20+，然后执行：
-
-```bash
-npm install -g pm2
-```
-
-Cloudflare Tunnel 页面会针对你的系统给出当前版本的 `cloudflared` 安装命令，优先使用该命令。
-
-## 3. 一键部署 MCP
+## 3. 部署 MCP
 
 克隆仓库：
 
