@@ -134,8 +134,8 @@ for _ in {1..20}; do
   if curl --silent --fail "http://127.0.0.1:${MCP_PORT}/healthz" >/dev/null; then
     echo
     echo "MCP is healthy."
-    echo "Kelivo transport: SSE"
-    echo "Kelivo URL: https://${MCP_DOMAIN}/${MCP_PATH_TOKEN}/sse"
+    echo "Kelivo transport: HTTP (Streamable HTTP)"
+    echo "Kelivo URL: https://${MCP_DOMAIN}/${MCP_PATH_TOKEN}/mcp"
     echo
     echo "Cloudflare Published application Service URL must be: http://localhost:${MCP_PORT}"
     exit 0

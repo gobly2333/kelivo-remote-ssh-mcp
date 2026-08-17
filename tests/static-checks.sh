@@ -7,6 +7,11 @@ bash -n "${ROOT_DIR}/scripts/install.sh"
 bash -n "${ROOT_DIR}/scripts/start.sh"
 bash -n "${ROOT_DIR}/scripts/status.sh"
 
+rg -q -- '--outputTransport streamableHttp' "${ROOT_DIR}/scripts/start.sh"
+rg -q -- '--streamableHttpPath' "${ROOT_DIR}/scripts/start.sh"
+rg -q -- 'Kelivo transport: HTTP \(Streamable HTTP\)' "${ROOT_DIR}/scripts/install.sh"
+rg -q -- '/mcp' "${ROOT_DIR}/README.md"
+
 if rg -n --hidden \
   --glob '!.git/**' \
   --glob '!tests/static-checks.sh' \

@@ -23,15 +23,12 @@ source "${RUNTIME_FILE}"
 : "${MCP_PATH_TOKEN:?MCP_PATH_TOKEN is required}"
 : "${MCP_LOG_LEVEL:=info}"
 
-SSE_PATH="/${MCP_PATH_TOKEN}/sse"
-MESSAGE_PATH="/${MCP_PATH_TOKEN}/message"
-BASE_URL="https://${MCP_DOMAIN}"
+MCP_PATH="/${MCP_PATH_TOKEN}/mcp"
 
 exec npx -y supergateway \
   --stdio "npx -y @fangjunjie/ssh-mcp-server --config-file ${SSH_CONFIG_FILE}" \
+  --outputTransport streamableHttp \
   --port "${MCP_PORT}" \
-  --baseUrl "${BASE_URL}" \
-  --ssePath "${SSE_PATH}" \
-  --messagePath "${MESSAGE_PATH}" \
+  --streamableHttpPath "${MCP_PATH}" \
   --healthEndpoint /healthz \
   --logLevel "${MCP_LOG_LEVEL}"

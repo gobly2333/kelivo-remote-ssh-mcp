@@ -1,11 +1,11 @@
 # Kelivo Remote SSH MCP
 
-把一台 Ubuntu/Debian VPS 通过 Cloudflare Tunnel 暴露为远程 SSE MCP，让 Kelivo 中支持工具调用的模型执行 SSH 命令、上传和下载文件。
+把一台 Ubuntu/Debian VPS 通过 Cloudflare Tunnel 暴露为远程 Streamable HTTP MCP，让 Kelivo 中支持工具调用的模型执行 SSH 命令、上传和下载文件。
 
 本项目不是新的 SSH MCP 实现，而是一个可复用的部署套件，组合了：
 
 - [`@fangjunjie/ssh-mcp-server`](https://github.com/classfang/ssh-mcp-server)：提供 `execute-command`、`upload`、`download`、`list-servers` 四个 MCP 工具。
-- [`supergateway`](https://github.com/supercorp-ai/supergateway)：把 stdio MCP 转换为 Kelivo 可连接的 SSE 服务。
+- [`supergateway`](https://github.com/supercorp-ai/supergateway)：把 stdio MCP 转换为 Kelivo 可连接的 Streamable HTTP 服务。
 - [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/)：把 VPS 上的 `localhost:3000` 映射到 HTTPS 域名。
 - [PM2](https://pm2.keymetrics.io/)：让网关在 SSH 断线后继续运行。
 
@@ -13,7 +13,7 @@
 
 ```text
 Kelivo / LLM
-     │ HTTPS + SSE
+     │ HTTPS + Streamable HTTP
      ▼
 Cloudflare Tunnel
      │ http://localhost:3000
@@ -50,7 +50,7 @@ ssh-mcp-server
 - 使用 Termius、系统终端等 SSH 客户端登录 VPS。
 - 在 Cloudflare 网页创建 Tunnel，并把页面生成的 connector 安装命令粘贴到 VPS。
 - 在 VPS 中安装基础环境、克隆本仓库并运行安装器。
-- 把安装器输出的 SSE 地址填入 Kelivo，并将 MCP 分配给助手。
+- 把安装器输出的 HTTP MCP 地址填入 Kelivo，并将 MCP 分配给助手。
 
 完成这些步骤以后，只要所用模型 API 支持 Tool Calls，它就能通过 Kelivo 调用 `execute-command`、`upload`、`download` 和 `list-servers`，不要求模型本身是 Codex。
 
@@ -149,7 +149,7 @@ bash scripts/install.sh
 
 安装器启动后会依次询问以下内容。方括号中的值是默认值，想使用默认值时直接按回车：
 
-1. `Public MCP domain`：填写前面在 Cloudflare 创建的完整主机名，例如 `mcp.example.com`。不要填写 `https://`，也不要添加 `/sse`。
+1. `Public MCP domain`：填写前面在 Cloudflare 创建的完整主机名，例如 `mcp.example.com`。不要填写 `https://`，也不要添加 `/mcp`。
 2. `SSH host [127.0.0.1]`：如果 MCP 与要操作的 SSH 服务位于同一台 VPS，直接回车。
 3. `SSH port [22]`：SSH 没有修改过端口时直接回车。
 4. `SSH username [root]`：使用 root 登录时直接回车；否则填写实际 SSH 用户名。
@@ -189,15 +189,15 @@ Local MCP port [3000]:              # 直接回车
 
 两个文件权限均为 `600`，不会进入 Git 仓库或 PM2 参数。密码认证仍意味着拥有 VPS root 权限的进程可以读取凭据，请根据自己的威胁模型选择认证方式。
 
-完成后安装器会显示一条带随机路径的 Kelivo SSE URL，例如：
+完成后安装器会显示一条带随机路径的 Kelivo Streamable HTTP URL，例如：
 
 ```console
 MCP is healthy.
-Kelivo transport: SSE
-Kelivo URL: https://mcp.example.com/4df2.../sse
+Kelivo transport: HTTP (Streamable HTTP)
+Kelivo URL: https://mcp.example.com/4df2.../mcp
 ```
 
-复制 `Kelivo URL:` 后面的**完整地址**。不要只填写域名，也不要自行把它改成固定的 `/sse`。
+复制 `Kelivo URL:` 后面的**完整地址**。不要只填写域名，也不要自行把它改成固定的 `/mcp`。
 
 如果没有看到 `MCP is healthy.`，安装器会给出日志检查命令。也可以手动运行：
 
@@ -208,7 +208,7 @@ curl http://127.0.0.1:3000/healthz
 
 随机路径只能降低被扫描发现的概率，**不等于身份认证**。真正公开使用时请阅读 [SECURITY.md](SECURITY.md)。
 
-重新运行安装器会替换现有 PM2 进程并生成新的随机路径，因此 Kelivo 中原来的 SSE 地址也需要更新。
+重新运行安装器会替换现有 PM2 进程并生成新的随机路径，因此 Kelivo 中原来的 MCP 地址也需要更新。
 
 ## 4. Kelivo 配置
 
@@ -216,9 +216,11 @@ curl http://127.0.0.1:3000/healthz
 
 ```text
 名称：VPS SSH
-传输类型：SSE
-服务器地址：使用安装器输出的完整 SSE URL
+传输类型：HTTP
+服务器地址：使用安装器输出的完整 MCP URL
 ```
+
+这里的 HTTP 指 MCP 的 **Streamable HTTP** 传输。它使用单一 `/mcp` 端点，不依赖旧式 HTTP+SSE 的长期连接，更适合手机切后台、切换网络后重新发起工具调用。
 
 连接成功后应显示四个工具：
 

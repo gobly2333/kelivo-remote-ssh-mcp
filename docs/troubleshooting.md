@@ -8,7 +8,11 @@
 pm2 status
 curl http://127.0.0.1:3000/healthz
 sudo systemctl is-active cloudflared
-curl -i -N --max-time 5 "https://你的域名/你的随机路径/sse"
+curl -i --max-time 15 \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}' \
+  "https://你的域名/你的随机路径/mcp"
 ```
 
 正常结果：
@@ -16,7 +20,14 @@ curl -i -N --max-time 5 "https://你的域名/你的随机路径/sse"
 - PM2 状态为 `online`。
 - healthz 返回 `ok`。
 - cloudflared 返回 `active`。
-- 公网 SSE 返回 HTTP 200、`content-type: text/event-stream` 和 `event: endpoint`。五秒后 curl 超时是正常的，因为 SSE 是长连接。
+- 公网 MCP 初始化请求返回 HTTP 200，并在响应中包含 JSON-RPC 初始化结果。
+
+公网测试的常见结果：
+
+- `404`：随机路径错误，必须使用安装器输出的完整 `/随机路径/mcp` 地址。
+- `502`：Cloudflare connector 无法访问 VPS 的 `localhost:3000`。
+- `403`：请求被 Cloudflare Access、WAF 或其他访问规则拦截。
+- HTTP 200，但 Kelivo 连接失败：检查 Kelivo 是否选择了 **HTTP** 传输，而不是 SSE。
 
 ## Cloudflare 返回 502
 
@@ -68,6 +79,12 @@ pm2 logs kelivo-remote-ssh-mcp --lines 100 --nostream
 - 在助手配置或输入框工具面板中勾选该 MCP。
 - 使用明确提示词要求“立即调用 execute-command，不要让我手动执行”。
 - 确认当前模型/API 支持 Tool Calls。
+
+## 旧版 SSE 配置偶发断线
+
+旧版项目使用长期保持的 HTTP+SSE 连接。手机切后台或切换网络后，如果 Kelivo 没有及时重建连接，可能出现服务端正常但工具暂时不可用。
+
+当前版本默认使用 Streamable HTTP。更新仓库并重新运行安装器后，在 Kelivo 中选择 **HTTP**，填写安装器新输出的 `/随机路径/mcp` 地址。重新安装会生成新路径，旧 SSE 地址不再使用。
 
 ## `127.0.0.1` 到底是谁
 
